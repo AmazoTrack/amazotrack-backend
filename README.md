@@ -50,7 +50,7 @@ Edite o `.env` com sua `DATABASE_URL` e um `JWT_SECRET`.
 npx prisma migrate dev
 ```
 
-### 4. Iniciar o servidor
+### 4. Iniciar o servidors
 
 ```bash
 npm run dev

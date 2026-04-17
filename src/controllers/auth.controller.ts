@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { loginSchema } from "../schemas/auth.schemas";
  
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -29,11 +30,13 @@ export class AuthController {
           passwordHash
         }
       });
+
+      const { passwordHash: _, ...safeUser } = user;
  
       return res.status(201).json({
         error: false,
         message: "Usuário criado com sucesso",
-        user
+        user: safeUser
       });
  
     } catch (error) {
@@ -49,10 +52,10 @@ export class AuthController {
  
   static async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
+      const data = loginSchema.parse(req.body);
  
       const user = await prisma.user.findUnique({
-        where: { email }
+        where: { email: data.email }
       });
  
       if (!user) {
@@ -64,7 +67,7 @@ export class AuthController {
       }
  
       const passwordMatch = await bcrypt.compare(
-        password,
+        data.password,
         user.passwordHash
       );
  
