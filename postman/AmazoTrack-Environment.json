@@ -1,0 +1,22 @@
+{
+	"id": "ead4ab8b-fb6d-4e49-8e19-5e63c5add2b0",
+	"name": "Local API",
+	"values": [
+		{
+			"key": "baseUrl",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"color": null,
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2026-04-19T05:19:48.989Z",
+	"_postman_exported_using": "Postman/12.6.8"
+}
