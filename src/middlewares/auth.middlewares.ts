@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 interface TokenPayload {
-    id: number;
+    userId: number;
 }
 
 declare global {
@@ -28,16 +28,17 @@ export function authMiddleware(
             });
         }
 
-        const [,token] = authHeader.split(" ");
+        const token = authHeader.split(" ") [1];
 
         const decoded = jwt.verify(
             token,
-            process.env.JWT_SECRETS as string
+            process.env.JWT_SECRET as string
         ) as TokenPayload;
 
-        req.userId = decoded.id;
+        req.userId = decoded.userId;
 
         next();
+        
     } catch (error) {
         return res.status(401).json({
             error: true,

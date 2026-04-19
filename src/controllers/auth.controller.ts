@@ -2,17 +2,17 @@ import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { loginSchema } from "../schemas/auth.schemas";
- 
+import { loginSchema, registerSchema } from "../schemas/auth.schemas";
+
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
-      const { name, email, password } = req.body;
- 
+      const { name, email, password } = registerSchema.parse(req.body);
+
       const userExists = await prisma.user.findUnique({
         where: { email }
       });
- 
+
       if (userExists) {
         return res.status(400).json({
           error: true,
@@ -20,9 +20,9 @@ export class AuthController {
           details: []
         });
       }
- 
+
       const passwordHash = await bcrypt.hash(password, 10);
- 
+
       const user = await prisma.user.create({
         data: {
           name,
@@ -32,32 +32,32 @@ export class AuthController {
       });
 
       const { passwordHash: _, ...safeUser } = user;
- 
+
       return res.status(201).json({
         error: false,
         message: "Usuário criado com sucesso",
         user: safeUser
       });
- 
-    } catch (error) {
-        console.error(error);
-        
+
+    } catch (error: any) {
+      console.error(error);
+
       return res.status(500).json({
         error: true,
-        message: "Erro interno",
+        message: String(error?.message || "Erro interno"),
         details: []
       });
     }
   }
- 
+
   static async login(req: Request, res: Response) {
     try {
       const data = loginSchema.parse(req.body);
- 
+
       const user = await prisma.user.findUnique({
         where: { email: data.email }
       });
- 
+
       if (!user) {
         return res.status(401).json({
           error: true,
@@ -65,12 +65,12 @@ export class AuthController {
           details: []
         });
       }
- 
+
       const passwordMatch = await bcrypt.compare(
         data.password,
         user.passwordHash
       );
- 
+
       if (!passwordMatch) {
         return res.status(401).json({
           error: true,
@@ -78,21 +78,21 @@ export class AuthController {
           details: []
         });
       }
- 
+
       const token = jwt.sign(
         { userId: user.id },
         process.env.JWT_SECRET as string,
         { expiresIn: "8h" }
       );
- 
-      return res.json({
-        token
-      });
- 
-    } catch {
+
+      return res.json({ token });
+
+    } catch (error: any) {
+      console.error(error);
+
       return res.status(500).json({
         error: true,
-        message: "Erro interno",
+        message: String(error?.message || "Erro interno"),
         details: []
       });
     }
