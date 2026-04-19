@@ -147,4 +147,4 @@ WasteStatus: gerado | coletado | transportado | destinado
 
 Documentação interativa disponível em:
 - **Local:** `http://localhost:3000/api-docs`
-- **Railway:** `https://amazotrack-api.up.railway.app/api-docs`
+- **Railway:** `https://amazotrack-backend-production.up.railway.app/api-docs`

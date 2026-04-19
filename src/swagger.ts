@@ -12,12 +12,17 @@ const swaggerDocument = {
       name: "Pedro Paulo Margarido — Tech Lead",
     },
   },
+  
   servers: [
     {
       url: "http://localhost:3000",
       description: "Desenvolvimento local",
     },
-  ],
+    {
+      url: "https://amazotrack-backend-production.up.railway.app",
+      description: "Produção (Railway)",
+    },
+],
 
   tags: [
     { name: "Auth", description: "Registro e login de usuários" },
