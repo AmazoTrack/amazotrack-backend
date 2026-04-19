@@ -13,13 +13,18 @@ export class AuthController {
         where: { email }
       });
 
-      if (userExists) {
-        return res.status(400).json({
-          error: true,
-          message: "E-mail já cadastrado",
-          details: []
-        });
-      }
+         if (userExists) {
+      return res.status(400).json({
+        error: true,
+        message: "E-mail já cadastrado",
+        details: [
+          {
+            field: "email",
+            message: "E-mail já cadastrado"
+          }
+        ]
+      });
+    }
 
       const passwordHash = await bcrypt.hash(password, 10);
 
@@ -42,9 +47,20 @@ export class AuthController {
     } catch (error: any) {
       console.error(error);
 
+      if (error.errors) {
+        return res.status(400).json({
+          error: true,
+          message: "Dados inválidos",
+          details: error.errors.map((err: any) => ({
+            field: err.path[0],
+            message: err.message
+          }))
+        });
+      }
+
       return res.status(500).json({
         error: true,
-        message: String(error?.message || "Erro interno"),
+        message: "Erro interno",
         details: []
       });
     }
@@ -62,7 +78,12 @@ export class AuthController {
         return res.status(401).json({
           error: true,
           message: "Credenciais inválidas",
-          details: []
+          details: [
+            {
+              field: "email",
+              message: "E-mail ou senha incorretos"
+            }
+          ]
         });
       }
 
@@ -75,7 +96,12 @@ export class AuthController {
         return res.status(401).json({
           error: true,
           message: "Credenciais inválidas",
-          details: []
+          details: [
+            {
+              field: "password",
+              message: "E-mail ou senha incorretos"
+            }
+          ]
         });
       }
 
@@ -85,14 +111,27 @@ export class AuthController {
         { expiresIn: "8h" }
       );
 
-      return res.json({ token });
+      return res.status(200).json ({
+        token
+      });
 
-    } catch (error: any) {
+    } catch (error:any) {
       console.error(error);
+
+      if (error.errors) {
+        return res.status(401).json({
+          error: true,
+          message: "Dados inválidos",
+          details: error.errors.map((err: any) => ({
+            field: err.path[0],
+            message: err.message
+          }))
+        });
+      }
 
       return res.status(500).json({
         error: true,
-        message: String(error?.message || "Erro interno"),
+        message: "Erro interno",
         details: []
       });
     }

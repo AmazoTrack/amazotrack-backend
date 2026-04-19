@@ -5,6 +5,7 @@ import {
     updateWasteSchema
 } from "../schemas/waste.schema";
 import { classifyWaste } from "../utils/wasteClassifier";
+import { error } from "node:console";
 
 export class WasteController {
     static async create(req: Request, res: Response) {
@@ -20,6 +21,7 @@ export class WasteController {
                     sector: data.sector,
                     companyId: data.companyId,
                     userId: req.userId as number,
+                    
                     class: classifyWaste(data.description),
                     status: "gerado"
                 }
@@ -27,120 +29,264 @@ export class WasteController {
             
 
             return res.status(201).json(waste);
+
         } catch (error: any) {
             console.error(error);
 
-            return res.status(400).json({
+            if (error.errors) {
+                return res.status(400).json({
+                    error: true,
+                    message: "Dados inválidos",
+                    details: error.errors.map((err: any) => ({
+                        field: err.path[0],
+                        message: err.message
+                    }))
+                });
+            }
+
+            return res.status(500).json({
                 error: true,
-                message: "Dados inválidos",
-                details: error?.errors || error?.message || error
+                message: "Erro interno",
+                details: []
             });
         }
     }
 
     static async list(req: Request, res: Response) {
-        const page = Number(req.query.page?? 1);
-        const limit = Number(req.query.limit ?? 10);
-        const skip = (page - 1) * limit;
+        try {
+            const page = Number(req.query.page ?? 1);
+            const limit = Number(req.query.limit ?? 20);
+            const skip = (page - 1) * limit;
 
-        const [items, total] = await Promise.all([
-            prisma.waste.findMany({
-                where: { deletedAt: null },
-                skip,
-                take: limit,
-                orderBy: { createdAt: "desc"}
-            }),
-            prisma.waste.count({
-                where: { deletedAt: null }
-            })
-        ]);
+            const wasteClass = req.query.class as string;
+            const status = req.query.status as string;
+            const sector = req.query.sector as string;
 
-        return res.json({
-            page,
-            limit,
-            total,
-            data: items
-        });
-    }
-
-    static async findById(req: Request, res: Response) {
-        const id = Number(req.params.id);
-
-        const waste = await prisma.waste.findFirst({
-            where: {
-                id,
+            const where: any = {
                 deletedAt: null
-            }
-        });
+            };
 
-        if (!waste) {
-            return res.status(400).json({
+            if (wasteClass) {
+                where.class = wasteClass;
+            }
+
+            if (status) {
+                where.class = status;
+            }
+            if (sector) {
+                where.sector = {
+                    contains: sector,
+                    mode: "insensitive"
+                };
+            }
+
+            const [data, total] = await Promise.all([
+                prisma.waste.findMany({
+                    where,
+                    skip,
+                    take: limit,
+                    orderBy: {
+                        createdAt: "desc"
+                    }
+                }),
+                prisma.waste.count({ where })
+            ]);
+
+            return res.status(200).json({
+                data,
+                total,
+                page,
+                limit
+            });
+
+        } catch (error) {
+            console.error(error);
+
+            return res.status(500).json({
                 error: true,
-                message: "Resíduo não encontrado"
+                message: "Erro interno",
+                details: []
             });
         }
-
-        return res.json(waste);
     }
+    
 
-    static async update(req: Request, res: Response) {
+    static async findById(req: Request, res: Response) {
         try {
-            if("statyus" in req.body) {
-                return res.status(400).json({
+            const id = Number(req.params.id);
+
+            if(isNaN(id)) {
+                return res.status(404).json({
                     error: true,
-                    message: "Status não pode ser alterado nesta rota"
+                    message: "Resíduo não encontrado",
+                    details: []
                 });
             }
 
-            const id = Number(req.params.id);
-            const data = updateWasteSchema.parse(req.body);
-
-            const waste = await prisma.waste.update({
-                where: { id },
-                data: {
-                    ...data,
-                    ...(data.description && {
-                        class: classifyWaste(data.description)
-                    })
+            const waste = await prisma.waste.findFirst({
+                where: {
+                    id,
+                    deletedAt: null
                 }
             });
 
-            return res.json(waste);
+            if (!waste) {
+                return res.status(404).json({
+                    error: true,
+                    message: "Resíduo não encontrado",
+                    details: []
+                });
+            }
 
-        } catch (error: any) {
-            return res.status(400).json({
+            return res.status(200).json(waste);
+
+        } catch (error) {
+            console.error(error);
+
+            return res.status(500).json({
                 error: true,
-                message: "Dados inválidos",
-                details: error.errors ?? []
+                message: "Erro interno",
+                details: []
             });
         }
     }
 
+
+   static async update(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+
+    if (isNaN(id)) {
+      return res.status(404).json({
+        error: true,
+        message: "Resíduo não encontrado",
+        details: []
+      });
+    }
+
+    if ("status" in req.body) {
+      return res.status(400).json({
+        error: true,
+        message: "Não é permitido alterar o status",
+        details: []
+      });
+    }
+
+    const exists = await prisma.waste.findFirst({
+      where: {
+        id,
+        deletedAt: null
+      }
+    });
+
+    if (!exists) {
+      return res.status(404).json({
+        error: true,
+        message: "Resíduo não encontrado",
+        details: []
+      });
+    }
+
+    const data = updateWasteSchema.parse(req.body);
+
+    const updateData: any = {
+        ...data
+    };
+
+    if (data.description) {
+        updateData.class = classifyWaste(data.description);
+    }
+
+    const waste = await prisma.waste.update({
+        where: { id },
+        data: updateData
+    });
+
+    return res.status(200).json(waste);
+
+  } catch (error: any) {
+    console.error(error);
+
+    if (error.errors) {
+      return res.status(400).json({
+        error: true,
+        message: "Dados inválidos",
+        details: error.errors.map((err: any) => ({
+          field: err.path[0],
+          message: err.message
+        }))
+      });
+    }
+
+    return res.status(500).json({
+      error: true,
+      message: "Erro interno",
+      details: []
+    });
+  }
+}
+
     static async remove(req: Request, res: Response) {
-        const id = Number(req.params.id);
+        try {
+            const id = Number(req.params.id);
 
-        const movements = await prisma.movement.count({
-            where:{ wasteId: id }
-        });
+            if (isNaN(id)) {
+                return res.status(404).json({
+                    error: true,
+                    message: "Resíduo não encontrado",
+                    details: []
+                }); 
+            }
 
-        if (movements > 0) {
-            return res.status(409).json({
+            const waste = await prisma.waste.findFirst({
+                where: {
+                    id,
+                    deletedAt: null
+                }
+            });
+
+            if (!waste) {
+                return res.status(404).json({
+                    error: true,
+                    message: "Resíduo não encontrado",
+                    details: []
+                });
+            }
+
+            const movements = await prisma.movement.count({
+                where: { wasteId: id }
+            });
+
+            if (movements > 0) {
+                return res.status(409).json({
+                    error: true,
+                    message: "Resíduo possui movimentações - não pode ser excluído",
+                    details: []
+                });
+            }
+
+
+            await prisma.waste.update({
+                where: { id },
+                data: {
+                    deletedAt: new Date()
+                }
+            });
+
+            return res.status(200).json({
+                error: false,
+                message: "Resíduo excluído com sucesso"
+            });
+
+        } catch (error: any) {
+            console.error(error);
+
+            return res.status(500).json({
                 error: true,
-                message: "Não é possível excluir resíduo com movimentações"
+                message: "Erro interno",
+                details: []
             });
         }
-
-        await prisma.waste.update({
-            where: { id },
-            data: {
-                deletedAt: new Date()
-            }
-        });
-
-        return res.json({
-            error: false,
-            message: "Resíduo removido com sucesso"
-        });
     }
 }
 
