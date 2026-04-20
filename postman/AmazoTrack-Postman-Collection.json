@@ -9,6 +9,16 @@
     {
       "name": "Registrar Usuário",
       "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{ token }}",
+              "type": "string"
+            }
+          ]
+        },
         "method": "POST",
         "header": [],
         "body": {
@@ -42,14 +52,9 @@
           "listen": "test",
           "script": {
             "exec": [
-              "const response = pm.response.json();\r",
+              "const json = pm.response.json();\r",
               "\r",
-              "if (response.token){\r",
-              "    pm.collectionVariables.set(\"token\", response.token);\r",
-              "    console.log(\"Token salvo!\");\r",
-              "} else {\r",
-              "    console.log(\"Token não encontrado\");\r",
-              "}"
+              "pm.environment.set(\"token\", json.token);"
             ],
             "type": "text/javascript",
             "packages": {},
@@ -95,7 +100,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3NjU2ODE4MywiZXhwIjoxNzc2NTk2OTgzfQ.QNZktUlpTzCcBsEagwPGKkR8GF3mLmfz5Dafm8ptgb8",
+              "value": "{{ token }}",
               "type": "string"
             }
           ]
@@ -133,7 +138,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3NjU2ODE4MywiZXhwIjoxNzc2NTk2OTgzfQ.QNZktUlpTzCcBsEagwPGKkR8GF3mLmfz5Dafm8ptgb8",
+              "value": "{{ token }}",
               "type": "string"
             }
           ]
@@ -171,7 +176,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3NjU2ODE4MywiZXhwIjoxNzc2NTk2OTgzfQ.QNZktUlpTzCcBsEagwPGKkR8GF3mLmfz5Dafm8ptgb8",
+              "value": "{{ token }}",
               "type": "string"
             }
           ]
@@ -201,7 +206,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3NjU2ODE4MywiZXhwIjoxNzc2NTk2OTgzfQ.QNZktUlpTzCcBsEagwPGKkR8GF3mLmfz5Dafm8ptgb8",
+              "value": "{{ token }}",
               "type": "string"
             }
           ]
@@ -240,7 +245,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3NjU2ODE4MywiZXhwIjoxNzc2NTk2OTgzfQ.QNZktUlpTzCcBsEagwPGKkR8GF3mLmfz5Dafm8ptgb8",
+              "value": "{{ token }}",
               "type": "string"
             }
           ]
@@ -279,7 +284,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3NjU2ODE4MywiZXhwIjoxNzc2NTk2OTgzfQ.QNZktUlpTzCcBsEagwPGKkR8GF3mLmfz5Dafm8ptgb8",
+              "value": "{{ token }}",
               "type": "string"
             }
           ]
@@ -311,6 +316,16 @@
       "response": []
     }
   ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{ token }}",
+        "type": "string"
+      }
+    ]
+  },
   "event": [
     {
       "listen": "prerequest",
