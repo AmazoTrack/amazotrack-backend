@@ -5,7 +5,7 @@ import {
     updateWasteSchema
 } from "../schemas/waste.schema";
 import { classifyWaste } from "../utils/wasteClassifier";
-import { error } from "node:console";
+
 
 export class WasteController {
     static async create(req: Request, res: Response) {
@@ -71,7 +71,7 @@ export class WasteController {
             }
 
             if (status) {
-                where.class = status;
+                where.status = status;
             }
             if (sector) {
                 where.sector = {
