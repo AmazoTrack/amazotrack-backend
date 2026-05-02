@@ -1,106 +1,108 @@
 generator client {
   provider = "prisma-client-js"
 }
- 
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
- 
+
 enum CompanyType {
   geradora
   destinadora
 }
- 
+
 enum WasteClass {
   I
   II_A
   II_B
 }
- 
+
 enum WasteStatus {
   gerado
   coletado
   transportado
   destinado
 }
- 
+
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
   passwordHash String
-  createdAt DateTime @default(now())
- 
-  wastes    Waste[]
+  createdAt    DateTime @default(now())
+
+  wastes Waste[]
 }
- 
+
 model Company {
-  id                Int      @id @default(autoincrement())
-  corporateName     String
-  cnpj              String   @unique
-  type              CompanyType
- 
-  licenseNumber     String?
-  issuingAgency     String?
-  licenseExpiry     DateTime?
+  id            Int         @id @default(autoincrement())
+  corporateName String
+  cnpj          String      @unique
+  type          CompanyType
+
+  licenseNumber      String?
+  issuingAgency      String?
+  licenseExpiry      DateTime?
   acceptedWasteTypes String?
- 
-  phone             String?
-  email             String?
- 
-  createdAt         DateTime @default(now())
- 
-  generatedWastes   Waste[]
-  receivedMtrs      MTR[]
+
+  phone String?
+  email String?
+
+  createdAt DateTime @default(now())
+
+  generatedWastes Waste[]
+  movements       Movement[]
+  receivedMtrs    MTR[]
 }
- 
+
 model Waste {
-  id          Int        @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   code        String?
   description String
   quantity    Float
   unit        String
   sector      String
- 
-  class       WasteClass
-  status      WasteStatus @default(gerado)
- 
-  createdAt   DateTime   @default(now())
-  deletedAt   DateTime?
- 
-  userId      Int
-  companyId   Int
- 
-  user        User       @relation(fields: [userId], references: [id])
-  company     Company    @relation(fields: [companyId], references: [id])
- 
-  movements   Movement[]
-  mtr         MTR?
+
+  class  WasteClass
+  status WasteStatus @default(gerado)
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  userId    Int
+  companyId Int
+
+  user    User    @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  movements Movement[]
+
+  mtr MTR?
 }
- 
+
 model Movement {
-  id          Int        @id @default(autoincrement())
-  toState     WasteStatus
-  notes       String?
-  transporter String?
-  destinationDate DateTime?
- 
-  createdAt   DateTime   @default(now())
- 
-  wasteId     Int
-  waste       Waste      @relation(fields: [wasteId], references: [id])
+  id        Int         @id @default(autoincrement())
+  wasteId   Int
+  companyId Int
+  type      WasteStatus
+  notes     String?
+  date      DateTime    @default(now())
+  createdAt DateTime    @default(now())
+
+  waste   Waste   @relation(fields: [wasteId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
 }
- 
+
 model MTR {
-  id              Int      @id @default(autoincrement())
-  number          String   @unique
-  transporter     String
-  issueDate       DateTime @default(now())
- 
-  wasteId         Int      @unique
-  destinationId   Int
- 
-  waste           Waste    @relation(fields: [wasteId], references: [id])
-  destination     Company @relation(fields: [destinationId], references: [id])
+  id          Int      @id @default(autoincrement())
+  number      String   @unique
+  transporter String
+  issueDate   DateTime @default(now())
+
+  wasteId       Int @unique
+  destinationId Int
+
+  waste       Waste   @relation(fields: [wasteId], references: [id])
+  destination Company @relation(fields: [destinationId], references: [id])
 }
