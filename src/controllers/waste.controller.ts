@@ -1,185 +1,84 @@
-import { Request, Response} from "express";
-import { prisma} from "../lib/prisma";
-import {
-    createWasteSchema,
-    updateWasteSchema
-} from "../schemas/waste.schema";
-import { classifyWaste } from "../utils/wasteClassifier";
 
+import { Request, Response } from "express";
+import { ZodError } from "zod";
+
+import { prisma } from "../lib/prisma";
+
+import {
+  createWasteSchema,
+  updateWasteSchema
+} from "../schemas/waste.schema";
 
 export class WasteController {
-    static async create(req: Request, res: Response) {
-        try {
-            const data = createWasteSchema.parse(req.body);
 
-            const waste = await prisma.waste.create({
-                data: {
-                    code: data.code,
-                    description: data.description,
-                    quantity: data.quantity,
-                    unit: data.unit,
-                    sector: data.sector,
-                    companyId: data.companyId,
-                    userId: req.userId as number,
-                    
-                    class: classifyWaste(data.description),
-                    status: "gerado"
-                }
-            });
-            
+  static async create(req: Request, res: Response) {
 
-            return res.status(201).json(waste);
+    try {
 
-        } catch (error: any) {
-            console.error(error);
+      const body = createWasteSchema.parse(req.body);
 
-            if (error.errors) {
-                return res.status(400).json({
-                    error: true,
-                    message: "Dados inválidos",
-                    details: error.errors.map((err: any) => ({
-                        field: err.path[0],
-                        message: err.message
-                    }))
-                });
-            }
-
-            return res.status(500).json({
-                error: true,
-                message: "Erro interno",
-                details: []
-            });
+      const waste = await prisma.waste.create({
+        data: {
+          ...body,
+          userId: req.userId!
         }
+      });
+
+      return res.status(201).json(waste);
+
+    } catch (error: any) {
+
+      if (error instanceof ZodError) {
+
+        return res.status(400).json({
+          error: true,
+          message: "Dados inválidos",
+          details: error.issues.map((err) => ({
+            field: err.path[0],
+            message: err.message
+          }))
+        });
+      }
+
+      return res.status(500).json({
+        error: true,
+        message: "Erro ao criar resíduo",
+        details: []
+      });
     }
+  }
 
-    static async list(req: Request, res: Response) {
-        try {
-            const page = Number(req.query.page ?? 1);
-            const limit = Number(req.query.limit ?? 20);
-            const skip = (page - 1) * limit;
+  static async list(req: Request, res: Response) {
 
-            const wasteClass = req.query.class as string;
-            const status = req.query.status as string;
-            const sector = req.query.sector as string;
+    const wastes = await prisma.waste.findMany({
+      where: {
+        deletedAt: null
+      }
+    });
 
-            const where: any = {
-                deletedAt: null
-            };
+    return res.json(wastes);
+  }
 
-            if (wasteClass) {
-                where.class = wasteClass;
-            }
+  static async findById(req: Request, res: Response) {
 
-            if (status) {
-                where.status = status;
-            }
-            if (sector) {
-                where.sector = {
-                    contains: sector,
-                    mode: "insensitive"
-                };
-            }
-
-            const [data, total] = await Promise.all([
-                prisma.waste.findMany({
-                    where,
-                    skip,
-                    take: limit,
-                    orderBy: {
-                        createdAt: "desc"
-                    }
-                }),
-                prisma.waste.count({ where })
-            ]);
-
-            return res.status(200).json({
-                data,
-                total,
-                page,
-                limit
-            });
-
-        } catch (error) {
-            console.error(error);
-
-            return res.status(500).json({
-                error: true,
-                message: "Erro interno",
-                details: []
-            });
-        }
-    }
-    
-
-    static async findById(req: Request, res: Response) {
-        try {
-            const id = Number(req.params.id);
-
-            if(isNaN(id)) {
-                return res.status(404).json({
-                    error: true,
-                    message: "Resíduo não encontrado",
-                    details: []
-                });
-            }
-
-            const waste = await prisma.waste.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
-
-            if (!waste) {
-                return res.status(404).json({
-                    error: true,
-                    message: "Resíduo não encontrado",
-                    details: []
-                });
-            }
-
-            return res.status(200).json(waste);
-
-        } catch (error) {
-            console.error(error);
-
-            return res.status(500).json({
-                error: true,
-                message: "Erro interno",
-                details: []
-            });
-        }
-    }
-
-
-   static async update(req: Request, res: Response) {
-  try {
     const id = Number(req.params.id);
 
     if (isNaN(id)) {
-      return res.status(404).json({
-        error: true,
-        message: "Resíduo não encontrado",
-        details: []
-      });
-    }
-
-    if ("status" in req.body) {
       return res.status(400).json({
         error: true,
-        message: "Não é permitido alterar o status",
+        message: "ID inválido",
         details: []
       });
     }
 
-    const exists = await prisma.waste.findFirst({
+    const waste = await prisma.waste.findFirst({
       where: {
         id,
         deletedAt: null
       }
     });
 
-    if (!exists) {
+    if (!waste) {
       return res.status(404).json({
         error: true,
         message: "Resíduo não encontrado",
@@ -187,107 +86,91 @@ export class WasteController {
       });
     }
 
-    const data = updateWasteSchema.parse(req.body);
+    return res.json(waste);
+  }
 
-    const updateData: any = {
-        ...data
-    };
+  static async update(req: Request, res: Response) {
 
-    if (data.description) {
-        updateData.class = classifyWaste(data.description);
-    }
+    try {
 
-    const waste = await prisma.waste.update({
-        where: { id },
-        data: updateData
-    });
+      const id = Number(req.params.id);
 
-    return res.status(200).json(waste);
+      if (isNaN(id)) {
+        return res.status(400).json({
+          error: true,
+          message: "ID inválido",
+          details: []
+        });
+      }
 
-  } catch (error: any) {
-    console.error(error);
+      const body = updateWasteSchema.parse(req.body);
 
-    if (error.errors) {
-      return res.status(400).json({
+      const waste = await prisma.waste.update({
+        where: {
+          id
+        },
+        data: body
+      });
+
+      return res.json(waste);
+
+    } catch (error: any) {
+
+      if (error instanceof ZodError) {
+
+        return res.status(400).json({
+          error: true,
+          message: "Dados inválidos",
+          details: error.issues.map((err) => ({
+            field: err.path[0],
+            message: err.message
+          }))
+        });
+      }
+
+      return res.status(500).json({
         error: true,
-        message: "Dados inválidos",
-        details: error.errors.map((err: any) => ({
-          field: err.path[0],
-          message: err.message
-        }))
+        message: "Erro ao atualizar resíduo",
+        details: []
       });
     }
+  }
 
-    return res.status(500).json({
-      error: true,
-      message: "Erro interno",
-      details: []
-    });
+  static async remove(req: Request, res: Response) {
+
+    try {
+
+      const id = Number(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({
+          error: true,
+          message: "ID inválido",
+          details: []
+        });
+      }
+
+      await prisma.waste.update({
+        where: {
+          id
+        },
+        data: {
+          deletedAt: new Date()
+        }
+      });
+
+      return res.json({
+        error: false,
+        message: "Resíduo removido com sucesso"
+      });
+
+    } catch {
+
+      return res.status(500).json({
+        error: true,
+        message: "Erro ao remover resíduo",
+        details: []
+      });
+    }
   }
 }
-
-    static async remove(req: Request, res: Response) {
-        try {
-            const id = Number(req.params.id);
-
-            if (isNaN(id)) {
-                return res.status(404).json({
-                    error: true,
-                    message: "Resíduo não encontrado",
-                    details: []
-                }); 
-            }
-
-            const waste = await prisma.waste.findFirst({
-                where: {
-                    id,
-                    deletedAt: null
-                }
-            });
-
-            if (!waste) {
-                return res.status(404).json({
-                    error: true,
-                    message: "Resíduo não encontrado",
-                    details: []
-                });
-            }
-
-            const movements = await prisma.movement.count({
-                where: { wasteId: id }
-            });
-
-            if (movements > 0) {
-                return res.status(409).json({
-                    error: true,
-                    message: "Resíduo possui movimentações - não pode ser excluído",
-                    details: []
-                });
-            }
-
-
-            await prisma.waste.update({
-                where: { id },
-                data: {
-                    deletedAt: new Date()
-                }
-            });
-
-            return res.status(200).json({
-                error: false,
-                message: "Resíduo excluído com sucesso"
-            });
-
-        } catch (error: any) {
-            console.error(error);
-
-            return res.status(500).json({
-                error: true,
-                message: "Erro interno",
-                details: []
-            });
-        }
-    }
-}
-
-

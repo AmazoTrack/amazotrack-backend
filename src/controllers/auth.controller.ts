@@ -1,57 +1,62 @@
+
 import { Request, Response } from "express";
-import { prisma } from "../lib/prisma";
-import bcrypt from "bcryptjs";
+import { ZodError } from "zod";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { loginSchema, registerSchema } from "../schemas/auth.schemas";
+
+import { prisma } from "../lib/prisma";
+
+import {
+  registerSchema,
+  loginSchema
+} from "../schemas/auth.schemas";
 
 export class AuthController {
+
   static async register(req: Request, res: Response) {
+
     try {
-      const { name, email, password } = registerSchema.parse(req.body);
+
+      const body = registerSchema.parse(req.body);
 
       const userExists = await prisma.user.findUnique({
-        where: { email }
+        where: {
+          email: body.email
+        }
       });
 
-         if (userExists) {
-      return res.status(400).json({
-        error: true,
-        message: "E-mail já cadastrado",
-        details: [
-          {
-            field: "email",
-            message: "E-mail já cadastrado"
-          }
-        ]
-      });
-    }
+      if (userExists) {
+        return res.status(409).json({
+          error: true,
+          message: "E-mail já cadastrado",
+          details: []
+        });
+      }
 
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(body.password, 10);
 
       const user = await prisma.user.create({
         data: {
-          name,
-          email,
+          name: body.name,
+          email: body.email,
           passwordHash
         }
       });
 
-      const { passwordHash: _, ...safeUser } = user;
-
       return res.status(201).json({
-        error: false,
-        message: "Usuário criado com sucesso",
-        user: safeUser
+        id: user.id,
+        name: user.name,
+        email: user.email
       });
 
     } catch (error: any) {
-      console.error(error);
 
-      if (error.errors) {
+      if (error instanceof ZodError) {
+
         return res.status(400).json({
           error: true,
           message: "Dados inválidos",
-          details: error.errors.map((err: any) => ({
+          details: error.issues.map((err) => ({
             field: err.path[0],
             message: err.message
           }))
@@ -60,69 +65,67 @@ export class AuthController {
 
       return res.status(500).json({
         error: true,
-        message: "Erro interno",
+        message: "Erro ao cadastrar usuário",
         details: []
       });
     }
   }
 
   static async login(req: Request, res: Response) {
+
     try {
-      const data = loginSchema.parse(req.body);
+
+      const body = loginSchema.parse(req.body);
 
       const user = await prisma.user.findUnique({
-        where: { email: data.email }
+        where: {
+          email: body.email
+        }
       });
 
       if (!user) {
         return res.status(401).json({
           error: true,
-          message: "Credenciais inválidas",
-          details: [
-            {
-              field: "email",
-              message: "E-mail ou senha incorretos"
-            }
-          ]
+          message: "E-mail ou senha inválidos",
+          details: []
         });
       }
 
       const passwordMatch = await bcrypt.compare(
-        data.password,
+        body.password,
         user.passwordHash
       );
 
       if (!passwordMatch) {
         return res.status(401).json({
           error: true,
-          message: "Credenciais inválidas",
-          details: [
-            {
-              field: "password",
-              message: "E-mail ou senha incorretos"
-            }
-          ]
+          message: "E-mail ou senha inválidos",
+          details: []
         });
       }
 
       const token = jwt.sign(
-        { userId: user.id },
+        {
+          userId: user.id
+        },
         process.env.JWT_SECRET as string,
-        { expiresIn: "8h" }
+        {
+          expiresIn: "1d"
+        }
       );
 
-      return res.status(200).json ({
+      return res.json({
         token
       });
 
-    } catch (error:any) {
-      console.error(error);
+    } catch (error: any) {
 
-      if (error.errors) {
-        return res.status(401).json({
+      if (error instanceof ZodError) {
+
+        return res.status(400).json({
           error: true,
           message: "Dados inválidos",
-          details: error.errors.map((err: any) => ({
+          details: error.issues.map((err) => ({
             field: err.path[0],
             message: err.message
           }))
@@ -131,7 +134,7 @@ export class AuthController {
 
       return res.status(500).json({
         error: true,
-        message: "Erro interno",
+        message: "Erro ao realizar login",
         details: []
       });
     }

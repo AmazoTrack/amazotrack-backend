@@ -1,132 +1,156 @@
+
 import { Request, Response } from "express";
+import { ZodError } from "zod";
+
 import { prisma } from "../lib/prisma";
 import { createMtrSchema } from "../schemas/mtr.schemas";
 
-
-
 export class MtrController {
 
+  static async create(req: Request, res: Response) {
 
+    try {
 
- static async create(req: Request, res: Response) {
-     try {
-     const body = createMtrSchema.parse(req.body);
+      const body = createMtrSchema.parse(req.body);
 
+      // 🔍 verifica se waste existe
+      const waste = await prisma.waste.findUnique({
+        where: {
+          id: body.wasteId
+        }
+      });
 
+      if (!waste) {
+        return res.status(404).json({
+          error: true,
+          message: "Resíduo não encontrado",
+          details: []
+        });
+      }
 
-     // 🔍 verifica se waste existe
-      const waste = await prisma.waste.findUnique({
-        where: { id: body.wasteId }
-      });
+      // 🔍 verifica se já possui MTR
+      const existingMtr = await prisma.mTR.findUnique({
+        where: {
+          wasteId: body.wasteId
+        }
+      });
 
- 
+      if (existingMtr) {
+        return res.status(409).json({
+          error: true,
+          message: "Este resíduo já possui um MTR",
+          details: []
+        });
+      }
 
-      if (!waste) {
-        return res.status(404).json({
-          error: true,
-          message: "Resíduo não encontrado",
-          details: []
-        });
-      }
+      // 🔍 verifica empresa
+      const company = await prisma.company.findUnique({
+        where: {
+          id: body.destinationId
+        }
+      });
 
- 
+      if (!company) {
+        return res.status(404).json({
+          error: true,
+          message: "Empresa destinadora não encontrada",
+          details: []
+        });
+      }
 
-      // 🔍 verifica se empresa existe
-      const company = await prisma.company.findUnique({
-        where: { id: body.destinationId }
-      });
+      // 📅 ano atual
+      const year = new Date().getFullYear();
 
- 
+      // 🔢 último MTR
+      const lastMtr = await prisma.mTR.findFirst({
+        orderBy: {
+          id: "desc"
+        }
+      });
 
-      if (!company) {
-        return res.status(404).json({
-          error: true,
-          message: "Empresa destinadora não encontrada",
-          details: []
-        });
-      }
+      let sequence = 1;
 
- 
+      if (lastMtr) {
+        sequence = lastMtr.id + 1;
+      }
 
-      const mtr = await prisma.mTR.create({
-        data: {
-          number: body.number,
-          transporter: body.transporter,
-          wasteId: body.wasteId,
-          destinationId: body.destinationId
-        }
-      });
+      // 🧾 gera número
+      const number = `MTR-${year}-${String(sequence).padStart(4, "0")}`;
 
- 
+      // ✅ cria
+      const mtr = await prisma.mTR.create({
+        data: {
+          number,
+          transporter: body.transporter,
+          wasteId: body.wasteId,
+          destinationId: body.destinationId
+        }
+      });
 
-      return res.status(201).json(mtr);
+      return res.status(201).json(mtr);
 
- 
+    } catch (error: any) {
 
-    } catch (error: any) {
+      if (error instanceof ZodError) {
 
- 
+        return res.status(400).json({
+          error: true,
+          message: "Dados inválidos",
+          details: error.issues.map((err) => ({
+            field: err.path[0],
+            message: err.message
+          }))
+        });
+      }
 
-      if (error.errors) {
-        return res.status(400).json({
-          error: true,
-          message: "Dados inválidos",
-          details: error.errors
-        });
-      }
+      return res.status(500).json({
+        error: true,
+        message: "Erro ao gerar MTR",
+        details: []
+      });
+    }
+  }
 
- 
+  static async list(req: Request, res: Response) {
 
-      return res.status(500).json({
-        error: true,
-        message: "Erro ao gerar MTR",
-        details: []
-      });
-    }
-  }
+    const mtrs = await prisma.mTR.findMany({
+      include: {
+        waste: true,
+        destination: true
+      }
+    });
 
- 
+    return res.json(mtrs);
+  }
 
-  static async list(req: Request, res: Response) {
-    const mtrs = await prisma.mTR.findMany({
-      include: {
-        waste: true,
-        destination: true
-      }
-    });
+  static async findById(req: Request, res: Response) {
 
- 
+    const id = Number(req.params.id);
 
-    return res.json(mtrs);
-  }
+    if (isNaN(id)) {
+      return res.status(400).json({
+        error: true,
+        message: "ID inválido",
+        details: []
+      });
+    }
 
- 
+    const mtr = await prisma.mTR.findUnique({
+      where: { id },
+      include: {
+        waste: true,
+        destination: true
+      }
+    });
 
-  static async findById(req: Request, res: Response) {
-    const id = Number(req.params.id);
+    if (!mtr) {
+      return res.status(404).json({
+        error: true,
+        message: "MTR não encontrado",
+        details: []
+      });
+    }
 
- 
-
-    const mtr = await prisma.mTR.findUnique({
-      where: { id },
-      include: {
-        waste: true,
-        destination: true
-      }
-    });
-
- 
-
-    if (!mtr) {
-      return res.status(404).json({
-        error: true,
-        message: "MTR não encontrado",
-        details: []
-      });
-    }
-
- 
-
-    return res.json(mtr);
-  }
+    return res.json(mtr);
+  }
 }
