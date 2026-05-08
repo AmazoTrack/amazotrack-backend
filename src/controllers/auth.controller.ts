@@ -1,7 +1,6 @@
-
 import { Request, Response } from "express";
 import { ZodError } from "zod";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs"; // FIX: era "bcrypt" (pacote errado)
 import jwt from "jsonwebtoken";
 
 import { prisma } from "../lib/prisma";
@@ -110,7 +109,7 @@ export class AuthController {
         },
         process.env.JWT_SECRET as string,
         {
-          expiresIn: "1d"
+          expiresIn: "8h" // FIX: era "1d", contrato diz 8h
         }
       );
 

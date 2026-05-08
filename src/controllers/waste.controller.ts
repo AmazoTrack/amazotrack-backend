@@ -1,8 +1,8 @@
-
 import { Request, Response } from "express";
 import { ZodError } from "zod";
 
 import { prisma } from "../lib/prisma";
+import { classifyWaste } from "../utils/wasteClassifier"; // FIX: agora é usado
 
 import {
   createWasteSchema,
@@ -17,9 +17,18 @@ export class WasteController {
 
       const body = createWasteSchema.parse(req.body);
 
+      // FIX: classificação NBR automática a partir da descrição
+      const wasteClass = classifyWaste(body.description);
+
       const waste = await prisma.waste.create({
         data: {
-          ...body,
+          code: body.code,
+          description: body.description,
+          quantity: body.quantity,
+          unit: body.unit,
+          sector: body.sector,
+          class: wasteClass,
+          companyId: body.companyId,
           userId: req.userId!
         }
       });
@@ -48,15 +57,41 @@ export class WasteController {
     }
   }
 
+  // FIX: agora retorna formato paginado { data, total, page, limit }
   static async list(req: Request, res: Response) {
 
-    const wastes = await prisma.waste.findMany({
-      where: {
-        deletedAt: null
-      }
-    });
+    try {
 
-    return res.json(wastes);
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 20;
+      const skip = (page - 1) * limit;
+
+      const total = await prisma.waste.count({
+        where: { deletedAt: null }
+      });
+
+      const wastes = await prisma.waste.findMany({
+        where: { deletedAt: null },
+        skip,
+        take: limit,
+        orderBy: { id: "desc" }
+      });
+
+      return res.json({
+        data: wastes,
+        total,
+        page,
+        limit
+      });
+
+    } catch {
+
+      return res.status(500).json({
+        error: true,
+        message: "Erro ao listar resíduos",
+        details: []
+      });
+    }
   }
 
   static async findById(req: Request, res: Response) {
@@ -103,13 +138,39 @@ export class WasteController {
         });
       }
 
+      // FIX: bloqueia tentativa de alterar status via PUT
+      if (req.body.status !== undefined) {
+        return res.status(400).json({
+          error: true,
+          message: "Não é permitido alterar o status via PUT. Use POST /movements.",
+          details: [{ field: "status", message: "Campo não permitido nesta rota" }]
+        });
+      }
+
       const body = updateWasteSchema.parse(req.body);
 
+      // Verifica se o resíduo existe e não foi deletado
+      const existing = await prisma.waste.findFirst({
+        where: { id, deletedAt: null }
+      });
+
+      if (!existing) {
+        return res.status(404).json({
+          error: true,
+          message: "Resíduo não encontrado",
+          details: []
+        });
+      }
+
+      // FIX: se a descrição mudou, reclassifica automaticamente
+      const updateData: any = { ...body };
+      if (body.description && body.description !== existing.description) {
+        updateData.class = classifyWaste(body.description);
+      }
+
       const waste = await prisma.waste.update({
-        where: {
-          id
-        },
-        data: body
+        where: { id },
+        data: updateData
       });
 
       return res.json(waste);
@@ -150,13 +211,35 @@ export class WasteController {
         });
       }
 
+      // Verifica se o resíduo existe
+      const waste = await prisma.waste.findFirst({
+        where: { id, deletedAt: null }
+      });
+
+      if (!waste) {
+        return res.status(404).json({
+          error: true,
+          message: "Resíduo não encontrado",
+          details: []
+        });
+      }
+
+      // FIX: verifica se há movimentações antes do soft delete
+      const hasMovements = await prisma.movement.findFirst({
+        where: { wasteId: id }
+      });
+
+      if (hasMovements) {
+        return res.status(409).json({
+          error: true,
+          message: "Resíduo possui movimentações e não pode ser removido",
+          details: []
+        });
+      }
+
       await prisma.waste.update({
-        where: {
-          id
-        },
-        data: {
-          deletedAt: new Date()
-        }
+        where: { id },
+        data: { deletedAt: new Date() }
       });
 
       return res.json({
