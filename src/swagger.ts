@@ -566,7 +566,7 @@ const swaggerDocument = {
     },
 
     // ── MTR ─────────────────────────────────────────────
-    "/mtsr": {
+    "/mtrs": {
       post: {
         tags: ["MTR"],
         summary: "Gerar MTR",
